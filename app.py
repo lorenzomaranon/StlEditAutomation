@@ -61,6 +61,7 @@ class GenerateRequest(BaseModel):
     front: Job = Job()
     left: Job = Job()
     right: Job = Job()
+    faces: dict | None = None  # calibración actual de la interfaz (si no, la guardada)
 
 
 @app.get("/api/template")
@@ -125,7 +126,7 @@ def generate(req: GenerateRequest):
         jobs[name] = eg.TextJob(j.text, j.height, j.depth, j.font, j.spacing,
                                 tuple(j.offset[:2]), j.rotation)
     try:
-        result, warnings = eg.engrave(_mesh, _read_faces(), jobs)
+        result, warnings = eg.engrave(_mesh, req.faces or _read_faces(), jobs)
     except ValueError as e:
         raise HTTPException(400, str(e))
     buf = io.BytesIO()

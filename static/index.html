@@ -2,7 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Grabador STL">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Grabador de texto STL</title>
 <style>
   :root { --bg:#f4f5f7; --panel:#fff; --text:#1d2330; --muted:#6b7280; --line:#e2e5ea; --accent:#2563eb;
@@ -27,11 +34,31 @@
   #status.warn { color:#b45309; }
   #status.err { color:#b91c1c; }
   main { position:relative; }
-  #view { width:100%; height:100%; display:block; }
+  #view { width:100%; height:100%; display:block; touch-action:none; }
   #hint { position:absolute; top:12px; left:50%; transform:translateX(-50%); background:#111827e0; color:#fff;
           padding:8px 14px; border-radius:6px; display:none; }
-  details { margin-top:14px; font-size:13px; }
-  @media (max-width: 800px) { body { grid-template-columns:1fr; grid-template-rows:auto 60vh; height:auto; } }
+  aside > details { margin-top:14px; font-size:13px; }
+  .actions { align-items:center; }
+  .opts > summary { font-size:12px; color:var(--muted); cursor:pointer; margin-top:6px; }
+
+  /* ---------- móvil: visor arriba fijo, formulario debajo, botones abajo ---------- */
+  @media (max-width: 800px) {
+    body { display:flex; flex-direction:column; height:auto; min-height:100vh; font-size:15px; }
+    main { order:-1; position:sticky; top:0; flex:none; height:42vh; height:42svh; z-index:5;
+           border-bottom:1px solid var(--line); background:#eef0f3; }
+    aside { border-right:none; padding:12px 12px 0; overflow:visible; }
+    h1 { display:none; }
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    input, select { font-size:16px; padding:8px; }
+    button { padding:10px 14px; }
+    button.small { padding:7px 12px; font-size:14px; }
+    .actions { position:sticky; bottom:0; background:var(--panel); margin:0 -12px; padding:10px 12px;
+               padding-bottom:calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); z-index:4; }
+    .actions button { flex:1; }
+    #status { padding:4px 0 8px; }
+    aside > details { padding-bottom:24px; }
+    #hint { top:auto; bottom:12px; width:max-content; max-width:90%; text-align:center; }
+  }
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
@@ -41,7 +68,7 @@
 <aside>
   <h1>Grabador de texto STL</h1>
   <div id="faces"></div>
-  <div class="row">
+  <div class="row actions">
     <button class="primary" id="generate">Generar</button>
     <button id="download" disabled>Descargar STL</button>
     <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="auto" checked style="width:auto">auto</label>
@@ -49,7 +76,7 @@
   <div id="status"></div>
   <details>
     <summary>Calibración de caras</summary>
-    <p>Pulsa <b>Marcar</b> en una cara y haz clic sobre el modelo, en el punto donde quieres el centro del texto.
+    <p>Pulsa <b>Marcar</b> en una cara y haz clic (o toca) sobre el modelo, en el punto donde quieres el centro del texto.
        La orientación del texto se ajusta con <i>Giro</i>. Luego pulsa <b>Guardar ajustes</b> para que se recuerde
        (también se guardan altura, profundidad, fuente, etc.).</p>
     <div class="row">
@@ -57,7 +84,8 @@
       <button id="autodetect">Autodetectar caras</button>
       <button id="showTemplate">Ver original</button>
       <button id="openTemplate">Cambiar plantilla STL…</button>
-      <input type="file" id="templateFile" accept=".stl" hidden>
+      <button id="resetTemplate">Plantilla original</button>
+      <input type="file" id="templateFile" accept=".stl,.STL,model/stl,application/sla,application/octet-stream" hidden>
     </div>
   </details>
 </aside>

@@ -2,7 +2,24 @@
 
 Graba (hunde) tres textos en `template.stl` —cara **frontal** (inclinada), **izquierda** y **derecha**— y devuelve un STL nuevo listo para imprimir. Sustituye el trabajo manual en Fusion.
 
-## Instalar como programa en Windows (recomendado)
+## Versión web (móvil)
+
+**https://lorenzomaranon.github.io/StlEditAutomation/**
+
+Funciona en cualquier navegador (móvil u ordenador) y el grabado se hace en el propio dispositivo, sin servidor.
+- En el móvil, el modelo 3D se queda arriba y los textos debajo. Para marcar una cara pulsa **Marcar** y toca el modelo.
+- **Descargar STL**: en Android va a Descargas. En iPhone se abre el menú de compartir: *Guardar en Archivos*, AirDrop, etc.
+- Los ajustes y la plantilla que cargues se guardan en ese navegador. **Plantilla original** vuelve al `template.stl` del repositorio.
+- Para que aparezca como una app: en Safari, *Compartir → Añadir a pantalla de inicio*; en Chrome, *⋮ → Añadir a pantalla de inicio*.
+
+Se publica automáticamente con cada push a `main` (workflow *Deploy web*). Para probarla en local:
+
+```bash
+python build_web.py
+python -m http.server -d _site 8080
+```
+
+## Instalar como programa en Windows
 
 1. Ve a la pestaña **Actions** del repositorio en GitHub → *Build Windows installer* → la última ejecución en verde → descarga el artefacto **GrabadorSTL-Setup** (es un .zip con el instalador dentro).
    Si se ha publicado una versión (etiqueta `v1.0.0`, etc.), también está en **Releases**.
@@ -74,6 +91,8 @@ Copia cualquier `.ttf`/`.otf` a `fonts/` y aparecerá en el desplegable. Incluid
 - `engrave.py`: convierte el texto en contornos con *fontTools*, los extruye con *manifold3d*, los coloca sobre la cara (sobresaliendo 0,5 mm hacia fuera y entrando `depth` mm) y los **resta** del modelo. El resultado es un sólido cerrado.
 - `app.py`: servidor FastAPI que sirve la web (`static/`, visor three.js incluido en `static/vendor`, funciona sin internet).
 - `desktop.py`: arranca el servidor en segundo plano y lo muestra en una ventana nativa (pywebview + Edge WebView2). Es el punto de entrada del `.exe` (`python desktop.py` para probarlo).
+- `static/engrave.js` + `static/api.js`: el mismo motor de grabado en JavaScript (manifold-3d en WebAssembly + opentype.js) para la versión web. Da los mismos resultados que `engrave.py`. `api.js` elige entre el servidor Python y el motor local.
+- `build_web.py`: genera la web estática en `_site/` (la publica `.github/workflows/deploy-pages.yml`).
 - `paths.py`: rutas de recursos y de datos de usuario (carpeta del proyecto en desarrollo, `%APPDATA%\GrabadorSTL` en el programa instalado).
 - Empaquetado: `GrabadorSTL.spec` (PyInstaller), `installer.iss` (Inno Setup) y `.github/workflows/build-windows.yml` (compilación en GitHub Actions).
 - Para usar otro modelo, sustituye `template.stl` y pulsa *Autodetectar caras* o marca las caras a mano.

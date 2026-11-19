@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { STLLoader } from "./vendor/STLLoader.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
+import { api } from "./api.js";
 
 const FACES = [
   { key: "front", label: "Frontal", color: "#e4572e" },
@@ -118,6 +119,7 @@ function setPicking(key) {
   const hint = document.getElementById("hint");
   hint.style.display = key ? "block" : "none";
   if (key) {
+    canvas.scrollIntoView({ block: "nearest" });
     hint.textContent = `Haz clic en la cara ${FACES.find((f) => f.key === key).label.toLowerCase()} (centro del texto)`;
     showTemplate();
   }
@@ -137,6 +139,8 @@ function buildForm() {
       <h2>${f.label} <span><button class="small" data-look="${f.key}">Ver</button>
         <button class="small" data-pick="${f.key}" style="--c:${f.color}">Marcar</button></span></h2>
       <textarea data-k="text" rows="1" placeholder="Texto ${f.label.toLowerCase()}">${c.text || ""}</textarea>
+      <details class="opts"${matchMedia("(max-width: 800px)").matches ? "" : " open"}>
+      <summary>Ajustes (${c.height} mm, prof. ${c.depth} mm)</summary>
       <div class="grid">
         <label>Altura (mm)<input data-k="height" type="number" step="0.5" min="0.5" value="${c.height}"></label>
         <label>Profund. (mm)<input data-k="depth" type="number" step="0.1" min="0.1" value="${c.depth}"></label>
@@ -145,7 +149,8 @@ function buildForm() {
         <label>Mover ↑ (mm)<input data-k="oy" type="number" step="0.5" value="${c.offset[1]}"></label>
         <label>Espaciado<input data-k="spacing" type="number" step="0.1" value="${c.spacing}"></label>
       </div>
-      <label style="margin-top:6px">Fuente<select data-k="font">${fontOpts}</select></label>`;
+      <label style="margin-top:6px">Fuente<select data-k="font">${fontOpts}</select></label>
+      </details>`;
     div.dataset.face = f.key;
     div.querySelector("select").value = config.fonts.includes(c.font) ? c.font : config.fonts[0];
     box.appendChild(div);
@@ -165,6 +170,8 @@ function readForm() {
     c.height = +v("height"); c.depth = +v("depth"); c.rotation = +v("rotation");
     c.spacing = +v("spacing"); c.font = v("font");
     c.offset = [+v("ox"), +v("oy")];
+    const sum = div.querySelector(".opts > summary");
+    if (sum) sum.textContent = `Ajustes (${c.height} mm, prof. ${c.depth} mm)`;
   }
 }
 
@@ -176,6 +183,14 @@ function jobs() {
                    spacing: c.spacing, offset: c.offset, rotation: c.rotation };
   }
   return out;
+}
+
+/** Caras con su calibración y ajustes actuales (sin los textos). */
+function currentFaces() {
+  readForm();
+  const faces = structuredClone(config.faces);
+  for (const k in faces) delete faces[k].text;
+  return faces;
 }
 
 function setStatus(msg, cls = "") {
@@ -198,14 +213,10 @@ async function generate() {
   setStatus("Generando…");
   try {
     const t0 = performance.now();
-    const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" },
-                                               body: JSON.stringify(jobs()) });
-    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-    const buf = await res.arrayBuffer();
+    const { buffer: buf, name, warnings } = await api.generate({ ...jobs(), faces: currentFaces() });
     lastBlob = new Blob([buf], { type: "model/stl" });
-    lastName = decodeURIComponent(res.headers.get("X-Filename") || "resultado.stl");
+    lastName = name;
     showGeometry(buf);
-    const warnings = JSON.parse(decodeURIComponent(res.headers.get("X-Warnings") || "[]"));
     document.getElementById("download").disabled = false;
     const ms = Math.round(performance.now() - t0);
     if (warnings.length) setStatus("⚠ " + warnings.join("\n⚠ "), "warn");
@@ -219,8 +230,7 @@ async function generate() {
 }
 
 async function showTemplate() {
-  const buf = await (await fetch("/api/template?t=" + Date.now())).arrayBuffer();
-  showGeometry(buf);
+  showGeometry(await api.getTemplate());
 }
 
 async function download() {
@@ -230,26 +240,29 @@ async function download() {
     setStatus(r.msg, r.ok ? "" : "warn");
     return;
   }
+  const file = new File([lastBlob], lastName, { type: "model/stl" });
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; } // iOS: Guardar en Archivos / enviar
+    catch (e) { if (e.name === "AbortError") return; }
+  }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(lastBlob);
   a.download = lastName;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 async function save() {
-  readForm();
-  const faces = structuredClone(config.faces);
-  for (const k in faces) delete faces[k].text; // los textos no se guardan
-  const res = await fetch("/api/faces", { method: "PUT", headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify(faces) });
-  setStatus(res.ok ? "Ajustes guardados" : "Error al guardar", res.ok ? "" : "err");
+  try {
+    await api.saveFaces(currentFaces());
+    setStatus("Ajustes guardados");
+  } catch (e) { setStatus("Error al guardar: " + e.message, "err"); }
 }
 
 async function autodetect() {
   readForm();
   const texts = Object.fromEntries(FACES.map((f) => [f.key, config.faces[f.key]?.text || ""]));
-  config.faces = await (await fetch("/api/autodetect", { method: "POST" })).json();
+  config.faces = await api.autodetect();
   for (const k in texts) if (config.faces[k]) config.faces[k].text = texts[k];
   buildForm(); drawMarkers();
   setStatus("Caras autodetectadas y guardadas.");
@@ -258,16 +271,15 @@ async function autodetect() {
 
 async function uploadTemplate(file) {
   setStatus("Cargando plantilla…");
-  const res = await fetch("/api/template", { method: "POST", body: await file.arrayBuffer() });
-  const out = await res.json();
-  if (!res.ok) { setStatus("Error: " + out.detail, "err"); return; }
+  let out;
+  try { out = await api.uploadTemplate(await file.arrayBuffer()); }
+  catch (e) { setStatus("Error: " + e.message, "err"); return; }
   readForm();
   const texts = Object.fromEntries(FACES.map((f) => [f.key, config.faces[f.key]?.text || ""]));
   config.faces = out.faces;
   for (const k in texts) if (config.faces[k]) config.faces[k].text = texts[k];
   buildForm();
-  const buf = await (await fetch("/api/template?t=" + Date.now())).arrayBuffer();
-  showGeometry(buf, true);
+  showGeometry(await api.getTemplate(), true);
   drawMarkers();
   setStatus(out.warning ? "⚠ " + out.warning : `Plantilla "${file.name}" cargada. Revisa las caras con "Ver".`,
             out.warning ? "warn" : "");
@@ -279,6 +291,21 @@ document.getElementById("templateFile").addEventListener("change", (e) => {
 });
 document.getElementById("openTemplate").addEventListener("click", () => document.getElementById("templateFile").click());
 
+async function resetTemplate() {
+  readForm();
+  const texts = Object.fromEntries(FACES.map((f) => [f.key, config.faces[f.key]?.text || ""]));
+  config.faces = (await api.resetTemplate()).faces;
+  for (const k in texts) if (config.faces[k]) config.faces[k].text = texts[k];
+  buildForm();
+  showGeometry(await api.getTemplate(), true);
+  drawMarkers();
+  setStatus("Plantilla original restaurada.");
+  scheduleAuto();
+}
+const resetBtn = document.getElementById("resetTemplate");
+if (api.canResetTemplate) resetBtn.addEventListener("click", resetTemplate);
+else resetBtn.remove();
+
 document.getElementById("generate").addEventListener("click", generate);
 document.getElementById("download").addEventListener("click", download);
 document.getElementById("save").addEventListener("click", save);
@@ -289,10 +316,9 @@ document.getElementById("showTemplate").addEventListener("click", showTemplate);
 (async () => {
   resize();
   render();
-  config = await (await fetch("/api/config")).json();
+  config = await api.getConfig();
   buildForm();
-  const buf = await (await fetch("/api/template?t=" + Date.now())).arrayBuffer();
-  showGeometry(buf, true);
+  showGeometry(await api.getTemplate(), true);
   drawMarkers();
   window.__ready = true;
 })();
