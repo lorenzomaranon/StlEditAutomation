@@ -1,0 +1,80 @@
+{
+  "left": {
+    "point": [
+      -32.4313,
+      -0.0,
+      -7.9201
+    ],
+    "normal": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ],
+    "height": 6,
+    "depth": 0.6,
+    "font": "DejaVuSans-Bold.ttf",
+    "rotation": 0,
+    "spacing": 0,
+    "offset": [
+      0,
+      0
+    ]
+  },
+  "right": {
+    "point": [
+      -32.431,
+      45.0,
+      -7.9201
+    ],
+    "normal": [
+      0.0,
+      1.0,
+      -0.0
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ],
+    "height": 6,
+    "depth": 0.6,
+    "font": "DejaVuSans-Bold.ttf",
+    "rotation": 0,
+    "spacing": 0,
+    "offset": [
+      0,
+      0
+    ]
+  },
+  "front": {
+    "point": [
+      -19.5783,
+      22.5,
+      13.2308
+    ],
+    "normal": [
+      0.6793,
+      -0.0,
+      0.7339
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ],
+    "height": 6,
+    "depth": 0.6,
+    "font": "DejaVuSans-Bold.ttf",
+    "rotation": 0,
+    "spacing": 0,
+    "offset": [
+      0,
+      0
+    ]
+  }
+}
