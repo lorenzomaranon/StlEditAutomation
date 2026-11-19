@@ -10,19 +10,21 @@ from pathlib import Path
 from urllib.parse import quote
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import engrave as eg
+import paths
 
-ROOT = Path(__file__).resolve().parent
-TEMPLATE = ROOT / "template.stl"
-FACES = ROOT / "faces.json"
+paths.ensure_user_data()
+TEMPLATE = paths.TEMPLATE
+FACES = paths.FACES
 
 app = FastAPI(title="STL Text Engraver")
 _mesh = eg.load_mesh(TEMPLATE)
+last_result: dict = {"data": None, "name": "resultado.stl"}  # último STL generado
 
 
 def _read_faces() -> dict:
@@ -64,6 +66,28 @@ class GenerateRequest(BaseModel):
 @app.get("/api/template")
 def get_template():
     return FileResponse(TEMPLATE, media_type="model/stl")
+
+
+@app.post("/api/template")
+async def upload_template(request: Request):
+    """Sustituye la plantilla por el STL enviado en el cuerpo y autodetecta las caras."""
+    global _mesh
+    data = await request.body()
+    if len(data) < 84:
+        raise HTTPException(400, "Archivo STL vacío o inválido")
+    tmp = TEMPLATE.with_suffix(".tmp.stl")
+    tmp.write_bytes(data)
+    try:
+        mesh = eg.load_mesh(tmp)
+        if len(mesh.faces) == 0:
+            raise ValueError("sin triángulos")
+    except Exception as e:  # noqa: BLE001
+        tmp.unlink(missing_ok=True)
+        raise HTTPException(400, f"No se pudo leer el STL: {e}")
+    tmp.replace(TEMPLATE)
+    _mesh = mesh
+    warn = None if mesh.is_watertight else "La malla no es un sólido cerrado; el grabado puede fallar."
+    return {"faces": autodetect(), "warning": warn}
 
 
 @app.get("/api/config")
@@ -108,6 +132,7 @@ def generate(req: GenerateRequest):
     result.export(buf, file_type="stl")
     parts = [re.sub(r"[^\w-]+", "_", getattr(req, n).text).strip("_") for n in eg.FACE_NAMES]
     fname = "_".join(p for p in parts if p) or "template"
+    last_result.update(data=buf.getvalue(), name=fname + ".stl")
     return Response(buf.getvalue(), media_type="model/stl", headers={
         "X-Warnings": quote(json.dumps(warnings, ensure_ascii=False)),
         "X-Filename": quote(fname + ".stl"),
@@ -115,7 +140,7 @@ def generate(req: GenerateRequest):
     })
 
 
-app.mount("/", StaticFiles(directory=ROOT / "static", html=True), name="static")
+app.mount("/", StaticFiles(directory=paths.STATIC, html=True), name="static")
 
 
 if __name__ == "__main__":

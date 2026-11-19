@@ -219,12 +219,17 @@ async function generate() {
 }
 
 async function showTemplate() {
-  const buf = await (await fetch("/api/template")).arrayBuffer();
+  const buf = await (await fetch("/api/template?t=" + Date.now())).arrayBuffer();
   showGeometry(buf);
 }
 
-function download() {
+async function download() {
   if (!lastBlob) return;
+  if (window.pywebview?.api?.save_stl) { // programa de escritorio: diálogo "Guardar como"
+    const r = await window.pywebview.api.save_stl(lastName);
+    setStatus(r.msg, r.ok ? "" : "warn");
+    return;
+  }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(lastBlob);
   a.download = lastName;
@@ -238,7 +243,7 @@ async function save() {
   for (const k in faces) delete faces[k].text; // los textos no se guardan
   const res = await fetch("/api/faces", { method: "PUT", headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify(faces) });
-  setStatus(res.ok ? "Ajustes guardados en faces.json" : "Error al guardar", res.ok ? "" : "err");
+  setStatus(res.ok ? "Ajustes guardados" : "Error al guardar", res.ok ? "" : "err");
 }
 
 async function autodetect() {
@@ -250,6 +255,29 @@ async function autodetect() {
   setStatus("Caras autodetectadas y guardadas.");
   scheduleAuto();
 }
+
+async function uploadTemplate(file) {
+  setStatus("Cargando plantilla…");
+  const res = await fetch("/api/template", { method: "POST", body: await file.arrayBuffer() });
+  const out = await res.json();
+  if (!res.ok) { setStatus("Error: " + out.detail, "err"); return; }
+  readForm();
+  const texts = Object.fromEntries(FACES.map((f) => [f.key, config.faces[f.key]?.text || ""]));
+  config.faces = out.faces;
+  for (const k in texts) if (config.faces[k]) config.faces[k].text = texts[k];
+  buildForm();
+  const buf = await (await fetch("/api/template?t=" + Date.now())).arrayBuffer();
+  showGeometry(buf, true);
+  drawMarkers();
+  setStatus(out.warning ? "⚠ " + out.warning : `Plantilla "${file.name}" cargada. Revisa las caras con "Ver".`,
+            out.warning ? "warn" : "");
+  scheduleAuto();
+}
+document.getElementById("templateFile").addEventListener("change", (e) => {
+  if (e.target.files[0]) uploadTemplate(e.target.files[0]);
+  e.target.value = "";
+});
+document.getElementById("openTemplate").addEventListener("click", () => document.getElementById("templateFile").click());
 
 document.getElementById("generate").addEventListener("click", generate);
 document.getElementById("download").addEventListener("click", download);
@@ -263,7 +291,7 @@ document.getElementById("showTemplate").addEventListener("click", showTemplate);
   render();
   config = await (await fetch("/api/config")).json();
   buildForm();
-  const buf = await (await fetch("/api/template")).arrayBuffer();
+  const buf = await (await fetch("/api/template?t=" + Date.now())).arrayBuffer();
   showGeometry(buf, true);
   drawMarkers();
   window.__ready = true;

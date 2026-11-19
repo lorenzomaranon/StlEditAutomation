@@ -18,8 +18,8 @@ import trimesh
 from fontTools.pens.basePen import BasePen
 from fontTools.ttLib import TTFont
 
-ROOT = Path(__file__).resolve().parent
-FONTS_DIR = ROOT / "fonts"
+import paths
+
 DEFAULT_FONT = "DejaVuSans-Bold.ttf"
 FACE_NAMES = ("front", "left", "right")
 OVERSHOOT = 0.5  # mm que el cuerpo del texto sobresale fuera de la cara
@@ -70,12 +70,14 @@ _font_cache: dict[str, TTFont] = {}
 
 
 def list_fonts() -> list[str]:
-    return sorted(p.name for p in FONTS_DIR.glob("*") if p.suffix.lower() in (".ttf", ".otf"))
+    return sorted({p.name for d in paths.font_dirs() for p in d.glob("*")
+                   if p.suffix.lower() in (".ttf", ".otf")})
 
 
 def _load_font(name: str) -> TTFont:
-    path = FONTS_DIR / Path(name).name
-    if not path.exists():
+    name = Path(name).name
+    path = next((d / name for d in paths.font_dirs() if (d / name).exists()), None)
+    if path is None:
         raise ValueError(f"Fuente no encontrada: {name}")
     if name not in _font_cache:
         _font_cache[name] = TTFont(str(path))
@@ -290,8 +292,8 @@ def autodetect_faces(mesh: trimesh.Trimesh) -> dict[str, dict]:
 
 def main():
     ap = argparse.ArgumentParser(description="Graba texto en las caras de un STL")
-    ap.add_argument("--input", default=str(ROOT / "template.stl"))
-    ap.add_argument("--faces", default=str(ROOT / "faces.json"))
+    ap.add_argument("--input", default=str(paths.TEMPLATE))
+    ap.add_argument("--faces", default=str(paths.FACES))
     ap.add_argument("--front", default="")
     ap.add_argument("--left", default="")
     ap.add_argument("--right", default="")
