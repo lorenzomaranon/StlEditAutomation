@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+salida*.stl
+.venv/
+dist/
+build/
+Output/
+error.log
+_site/

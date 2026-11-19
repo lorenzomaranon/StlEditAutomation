@@ -1,0 +1,8 @@
+numpy
+trimesh
+manifold3d
+fonttools
+scipy
+networkx
+fastapi
+uvicorn
