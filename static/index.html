@@ -39,6 +39,28 @@
           padding:8px 14px; border-radius:6px; display:none; }
   aside > details { margin-top:14px; font-size:13px; }
   .actions { align-items:center; }
+  .card { border:1px solid var(--line); border-left:5px solid #9ca3af; border-radius:8px; padding:10px; margin-bottom:12px; }
+  .card h2 { font-size:14px; margin:0 0 8px; display:flex; flex-wrap:wrap; gap:6px; justify-content:space-between; align-items:center; }
+  .card h2 small { font-weight:400; color:var(--muted); }
+  .card > summary { cursor:pointer; font-size:14px; margin-bottom:6px; }
+  .card label { margin-top:6px; }
+  label.inline { flex-direction:row; align-items:center; gap:4px; margin:0; }
+  label.inline input[type=checkbox] { width:auto; }
+  .info { font-size:13px; color:var(--text); padding:5px 0; }
+  .note { font-size:12px; color:var(--muted); min-height:4px; }
+  .chg { display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:6px; margin-top:4px; }
+  .chg.first { justify-content:space-between; background:#f7f8fa; }
+  .chg.sel { background:#eef4ff; outline:1px solid #bfd3ff; }
+  .chg .L { width:70px; }
+  .chg .z { flex:1; font-size:12px; color:var(--muted); }
+  .chg input[type=color], .chg.first input[type=color] { width:44px; height:30px; padding:2px; }
+  #sliceStatus { font-size:13px; white-space:pre-line; margin-top:6px; color:var(--muted); }
+  #sliceStatus.warn { color:#b45309; } #sliceStatus.err { color:#b91c1c; }
+  #layerBox { position:absolute; right:10px; top:44px; bottom:44px; display:none; flex-direction:column;
+              align-items:center; gap:6px; z-index:3; }
+  #layerSlider { writing-mode: vertical-lr; direction: rtl; flex:1; width:30px; margin:0; }
+  #layerLabel { background:#111827d9; color:#fff; padding:4px 8px; border-radius:6px; font-size:12px; white-space:nowrap; }
+  .base-row { align-items:center; }
   .opts > summary { font-size:12px; color:var(--muted); cursor:pointer; margin-top:6px; }
 
   /* ---------- móvil: visor arriba fijo, formulario debajo, botones abajo ---------- */
@@ -68,17 +90,49 @@
 <aside>
   <h1>Grabador de texto STL</h1>
   <div id="faces"></div>
+  <div class="card" id="colorsCard">
+    <h2>Colores <small>(cambios de filamento M600)</small>
+      <label class="inline"><input type="checkbox" id="printView"> Vista de impresión</label></h2>
+    <div class="grid">
+      <label>Altura capa (mm)<input id="lh" type="number" step="0.02" min="0.02"></label>
+      <label>Primera capa (mm)<input id="fl" type="number" step="0.02" min="0.02"></label>
+      <label>Total<span id="layerInfo" class="info"></span></label>
+    </div>
+    <div id="heightsNote" class="note"></div>
+    <div class="chg first"><span>Color inicial</span><input type="color" id="col0" title="Color de la primera capa"></div>
+    <div id="changes"></div>
+    <div class="row">
+      <button class="small" id="addChange">+ Cambio</button>
+      <button class="small" data-split="2">Mitades</button>
+      <button class="small" data-split="3">Tercios</button>
+      <button class="small" data-split="4">Cuartos</button>
+    </div>
+  </div>
+  <details class="card" id="sliceCard" hidden open>
+    <summary><b>Laminado (OrcaSlicer)</b></summary>
+    <label>OrcaSlicer
+      <span class="row" style="margin:0"><input id="orcaPath" placeholder="ruta de orca-slicer.exe" style="flex:1">
+      <button class="small" id="pickOrca">Buscar…</button></span></label>
+    <label>Impresora<select id="sel_machine"></select></label>
+    <label>Proceso<select id="sel_process"></select></label>
+    <label>Filamento<select id="sel_filament"></select></label>
+    <button class="primary" id="sliceBtn" style="margin-top:10px;width:100%">Laminar y guardar G-code</button>
+    <div id="sliceStatus"></div>
+  </details>
   <div class="row actions">
     <button class="primary" id="generate">Generar</button>
     <button id="download" disabled>Descargar STL</button>
     <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="auto" checked style="width:auto">auto</label>
   </div>
   <div id="status"></div>
-  <details>
+  <details id="calib">
     <summary>Calibración de caras</summary>
     <p>Pulsa <b>Marcar</b> en una cara y haz clic (o toca) sobre el modelo, en el punto donde quieres el centro del texto.
        La orientación del texto se ajusta con <i>Giro</i>. Luego pulsa <b>Guardar ajustes</b> para que se recuerde
        (también se guardan altura, profundidad, fuente, etc.).</p>
+    <div class="row base-row"><b>Base de impresión</b>
+      <button class="small" data-look="base">Ver</button>
+      <button class="small" data-pick="base" style="--c:#6b7280">Marcar</button></div>
     <div class="row">
       <button id="save">Guardar ajustes</button>
       <button id="autodetect">Autodetectar caras</button>
@@ -92,6 +146,7 @@
 <main>
   <canvas id="view"></canvas>
   <div id="hint"></div>
+  <div id="layerBox"><span id="layerLabel"></span><input type="range" id="layerSlider" min="2" max="100" step="1"></div>
 </main>
 <script type="module" src="main.js"></script>
 </body>

@@ -26,6 +26,7 @@ BUNDLED_FONTS = RESOURCES / "fonts"
 USER_FONTS = DATA / "fonts"
 TEMPLATE = DATA / "template.stl"
 FACES = DATA / "faces.json"
+SLICER_CFG = DATA / "slicer.json"
 
 
 def ensure_user_data() -> None:

@@ -118,42 +118,37 @@ export class Model {
   /** Igual que autodetect_faces en Python: mayores caras planas ±Y y la mayor inclinada. */
   autodetectFaces() {
     const ntri = this.tris.length / 3;
-    // agrupar por plano (normal y distancia redondeadas)
-    const groups = new Map();
+    // caras planas: regiones de triángulos vecinos con la misma normal (como trimesh.facets)
+    const parent = new Int32Array(ntri).map((_, i) => i);
+    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const edges = new Map();
     for (let t = 0; t < ntri; t++) {
       if (this.areas[t] <= 0) continue;
-      const n = this.normal(t);
-      const d = dot(n, this.tri(t)[0]);
-      const key = n.map((x) => Math.round(x * 500)).join(",") + "|" + Math.round(d * 20);
-      (groups.get(key) || groups.set(key, []).get(key)).push(t);
+      for (let k = 0; k < 3; k++) {
+        const a = this.tris[t * 3 + k], b = this.tris[t * 3 + ((k + 1) % 3)];
+        const key = a < b ? a * 4294967296 + b : b * 4294967296 + a;
+        const other = edges.get(key);
+        if (other === undefined) edges.set(key, t);
+        else if (dot(this.normal(t), this.normal(other)) > 0.99999) parent[find(t)] = find(other);
+      }
     }
-    // dentro de cada plano, separar regiones conectadas (aristas compartidas)
+    const comps = new Map();
+    for (let t = 0; t < ntri; t++) {
+      if (this.areas[t] <= 0) continue;
+      const r = find(t);
+      (comps.get(r) || comps.set(r, []).get(r)).push(t);
+    }
     const facets = [];
-    for (const list of groups.values()) {
-      const parent = new Map(list.map((t) => [t, t]));
-      const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
-      const edges = new Map();
-      for (const t of list) {
-        for (let k = 0; k < 3; k++) {
-          const a = this.tris[t * 3 + k], b = this.tris[t * 3 + ((k + 1) % 3)];
-          const key = a < b ? `${a}_${b}` : `${b}_${a}`;
-          const other = edges.get(key);
-          if (other === undefined) edges.set(key, t);
-          else parent.set(find(t), find(other));
-        }
+    for (const tris of comps.values()) {
+      if (tris.length < 2) continue;
+      let area = 0, c = [0, 0, 0], nn = [0, 0, 0];
+      for (const t of tris) {
+        const [a, b, cc] = this.tri(t);
+        const w = this.areas[t];
+        area += w;
+        for (let i = 0; i < 3; i++) { c[i] += w * (a[i] + b[i] + cc[i]) / 3; nn[i] += w * this.normals[t * 3 + i]; }
       }
-      const comps = new Map();
-      for (const t of list) { const r = find(t); (comps.get(r) || comps.set(r, []).get(r)).push(t); }
-      for (const tris of comps.values()) {
-        let area = 0, c = [0, 0, 0];
-        for (const t of tris) {
-          const [a, b, cc] = this.tri(t);
-          const w = this.areas[t];
-          area += w;
-          for (let i = 0; i < 3; i++) c[i] += w * (a[i] + b[i] + cc[i]) / 3;
-        }
-        facets.push({ area, normal: this.normal(tris[0]), point: scale(c, 1 / area) });
-      }
+      facets.push({ area, normal: unit(nn), point: scale(c, 1 / area), tris });
     }
     facets.sort((a, b) => b.area - a.area);
     const out = {};
@@ -165,7 +160,31 @@ export class Model {
       else if (!out.front && Math.abs(n[1]) < 0.1 && n[2] > 0.1 && n[2] < 0.99) out.front = entry;
       if (out.left && out.right && out.front) break;
     }
+    // base de impresión: mayor cara plana con agujero que mira hacia abajo sin ser horizontal
+    for (const f of facets) {
+      if (f.normal[2] > -0.99 && f.normal[2] < -0.1 && this.boundaryLoops(f.tris) >= 2) {
+        out.base = { point: f.point, normal: f.normal };
+        break;
+      }
+    }
     return out;
+  }
+
+  boundaryLoops(tris) {
+    const count = new Map();
+    for (const t of tris) for (let k = 0; k < 3; k++) {
+      const a = this.tris[t * 3 + k], b = this.tris[t * 3 + ((k + 1) % 3)];
+      const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+      count.set(key, (count.get(key) || 0) + 1);
+    }
+    const parent = new Map();
+    const find = (x) => { if (!parent.has(x)) parent.set(x, x); while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+    const verts = new Set();
+    for (const [key, c] of count) if (c === 1) {
+      const [a, b] = key.split("_").map(Number);
+      parent.set(find(a), find(b)); verts.add(a); verts.add(b);
+    }
+    return new Set([...verts].map(find)).size;
   }
 }
 

@@ -57,6 +57,34 @@ class Api:
         self.last_dir = str(path.parent)
         return {"ok": True, "msg": f"Guardado en {path}"}
 
+    def save_gcode(self, name: str | None = None) -> dict:
+        import webview
+        import app as server
+        data = server.last_gcode["data"]
+        if not data:
+            return {"ok": False, "msg": "Primero lamina el modelo"}
+        res = self.window.create_file_dialog(
+            webview.SAVE_DIALOG, directory=self.last_dir,
+            save_filename=name or server.last_gcode["name"],
+            file_types=("G-code (*.gcode)",))
+        if not res:
+            return {"ok": False, "msg": "Cancelado"}
+        path = Path(res if isinstance(res, str) else res[0])
+        if path.suffix.lower() != ".gcode":
+            path = path.with_suffix(".gcode")
+        path.write_bytes(data)
+        self.last_dir = str(path.parent)
+        return {"ok": True, "msg": f"G-code guardado en {path}"}
+
+    def pick_file(self, kind: str = "json") -> str | None:
+        """Elegir a mano orca-slicer.exe ('exe') o un perfil .json ('json')."""
+        import webview
+        types = ("Programa (*.exe)", "Todos los archivos (*.*)") if kind == "exe" else ("Perfil JSON (*.json)",)
+        res = self.window.create_file_dialog(webview.OPEN_DIALOG, file_types=types)
+        if not res:
+            return None
+        return res if isinstance(res, str) else res[0]
+
     def open_data_folder(self) -> None:
         if sys.platform == "win32":
             os.startfile(paths.DATA)  # noqa: S606
