@@ -67,6 +67,26 @@ Se abre `http://localhost:8000`:
 
 Si el texto se sale de la cara plana aparece un aviso ⚠: reduce la altura o muévelo.
 
+## Cambios de color (M600) y laminado con OrcaSlicer
+
+En la tarjeta **Colores** eliges el color inicial y añades cambios de filamento:
+- **Mitades / Tercios / Cuartos** reparte la pieza en partes iguales. Si el número de capas es impar se redondea hacia arriba: con 151 capas, el M600 va al inicio de la capa 76.
+- **+ Cambio** añade otro cambio. Con **⇕** lo seleccionas y lo mueves capa a capa con el deslizador del visor, o escribes la capa directamente.
+- El visor pinta cada tramo de su color. **Vista de impresión** muestra la pieza apoyada en su base, sobre la cama.
+
+La **base de impresión** es la cara sobre la que se apoya la pieza (en `template.stl`, la cara inclinada con el agujero). Viene detectada; se cambia en *Calibración de caras → Base de impresión → Marcar*.
+
+**Laminar (solo en el programa de Windows)**: en la tarjeta *Laminado (OrcaSlicer)* elige la impresora, el proceso y el filamento. Aparecen tus perfiles de usuario de OrcaSlicer, o puedes elegir otro `.json`. El programa:
+1. graba los textos,
+2. gira la pieza sobre su base,
+3. la lamina con la CLI de OrcaSlicer usando esos perfiles (la herencia de perfiles se resuelve antes de pasárselos),
+4. inserta `M600` al principio de cada capa de cambio,
+5. te pide dónde guardar el `.gcode`.
+
+La altura de capa y la de la primera capa se toman del perfil de proceso, así que las capas que ves coinciden con las del G-code. La impresora tiene que entender `M600`. En Klipper hace falta una macro `M600`.
+
+La web del móvil permite preparar y ver los cambios de color, pero no lamina.
+
 ## Calibrar las caras
 
 `faces.json` guarda, para cada cara, el punto donde va el centro del texto, la normal de la cara y los ajustes por defecto. Viene autodetectado para `template.stl`. Para cambiarlo:
@@ -93,6 +113,7 @@ Copia cualquier `.ttf`/`.otf` a `fonts/` y aparecerá en el desplegable. Incluid
 - `desktop.py`: arranca el servidor en segundo plano y lo muestra en una ventana nativa (pywebview + Edge WebView2). Es el punto de entrada del `.exe` (`python desktop.py` para probarlo).
 - `static/engrave.js` + `static/api.js`: el mismo motor de grabado en JavaScript (manifold-3d en WebAssembly + opentype.js) para la versión web. Da los mismos resultados que `engrave.py`. `api.js` elige entre el servidor Python y el motor local.
 - `build_web.py`: genera la web estática en `_site/` (la publica `.github/workflows/deploy-pages.yml`).
+- `slicer.py`: perfiles de OrcaSlicer (lectura y resolución de `inherits`), orientación sobre la base, llamada a la CLI e inserción de `M600` en el G-code. `static/layers.js` replica sus fórmulas de capas para la vista previa. Tests en `tests/` (`python -m pytest tests`).
 - `paths.py`: rutas de recursos y de datos de usuario (carpeta del proyecto en desarrollo, `%APPDATA%\GrabadorSTL` en el programa instalado).
 - Empaquetado: `GrabadorSTL.spec` (PyInstaller), `installer.iss` (Inno Setup) y `.github/workflows/build-windows.yml` (compilación en GitHub Actions).
 - Para usar otro modelo, sustituye `template.stl` y pulsa *Autodetectar caras* o marca las caras a mano.

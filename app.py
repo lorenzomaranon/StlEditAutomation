@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 import engrave as eg
 import paths
+import slicer as sl
 
 paths.ensure_user_data()
 TEMPLATE = paths.TEMPLATE
@@ -25,11 +26,18 @@ FACES = paths.FACES
 app = FastAPI(title="STL Text Engraver")
 _mesh = eg.load_mesh(TEMPLATE)
 last_result: dict = {"data": None, "name": "resultado.stl"}  # último STL generado
+last_gcode: dict = {"data": None, "name": "resultado.gcode"}  # último G-code laminado
 
 
 def _read_faces() -> dict:
     if FACES.exists():
-        return json.loads(FACES.read_text(encoding="utf-8"))
+        faces = json.loads(FACES.read_text(encoding="utf-8"))
+        if "base" not in faces:  # instalaciones anteriores: añadir la base detectada
+            base = eg.detect_base(_mesh)
+            if base:
+                faces["base"] = base
+                _write_faces(faces)
+        return faces
     faces = eg.autodetect_faces(_mesh)
     _write_faces(faces)
     return faces
@@ -114,12 +122,13 @@ def autodetect():
     for name, f in new.items():  # conservar ajustes de texto guardados
         keep = {k: v for k, v in old.get(name, {}).items() if k not in ("point", "normal", "up")}
         f.update(keep)
+    if "colors" in old:
+        new["colors"] = old["colors"]
     _write_faces(new)
     return new
 
 
-@app.post("/api/generate")
-def generate(req: GenerateRequest):
+def _engrave(req: GenerateRequest):
     jobs = {}
     for name in eg.FACE_NAMES:
         j: Job = getattr(req, name)
@@ -129,16 +138,99 @@ def generate(req: GenerateRequest):
         result, warnings = eg.engrave(_mesh, req.faces or _read_faces(), jobs)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    buf = io.BytesIO()
-    result.export(buf, file_type="stl")
     parts = [re.sub(r"[^\w-]+", "_", getattr(req, n).text).strip("_") for n in eg.FACE_NAMES]
     fname = "_".join(p for p in parts if p) or "template"
+    return result, warnings, fname
+
+
+@app.post("/api/generate")
+def generate(req: GenerateRequest):
+    result, warnings, fname = _engrave(req)
+    buf = io.BytesIO()
+    result.export(buf, file_type="stl")
     last_result.update(data=buf.getvalue(), name=fname + ".stl")
     return Response(buf.getvalue(), media_type="model/stl", headers={
         "X-Warnings": quote(json.dumps(warnings, ensure_ascii=False)),
         "X-Filename": quote(fname + ".stl"),
         "Access-Control-Expose-Headers": "X-Warnings, X-Filename",
     })
+
+
+# --------------------------------------------------------------------------- #
+# Laminado con OrcaSlicer y cambios de color
+# --------------------------------------------------------------------------- #
+def _slicer_cfg() -> dict:
+    cfg = {}
+    if paths.SLICER_CFG.exists():
+        try:
+            cfg = json.loads(paths.SLICER_CFG.read_text(encoding="utf-8"))
+        except ValueError:
+            cfg = {}
+    if not cfg.get("orca"):
+        cfg["orca"] = sl.find_orca() or ""
+    return cfg
+
+
+def _heights(cfg: dict) -> dict | None:
+    if not cfg.get("process"):
+        return None
+    try:
+        proc = sl.flatten_preset(cfg["process"], "process", sl.PresetIndex.default(cfg.get("orca") or None))
+    except (ValueError, OSError) as e:
+        return {"error": str(e)}
+    h, h1 = sl.layer_heights(proc)
+    return {"layer_height": h, "first_layer": h1}
+
+
+@app.get("/api/capabilities")
+def capabilities():
+    return {"slice": True}
+
+
+@app.get("/api/slicer")
+def get_slicer():
+    cfg = _slicer_cfg()
+    return {"config": cfg, "presets": sl.list_presets(), "heights": _heights(cfg)}
+
+
+@app.put("/api/slicer")
+def put_slicer(cfg: dict):
+    clean = {k: str(cfg.get(k) or "") for k in ("orca", *sl.PRESET_TYPES)}
+    paths.SLICER_CFG.write_text(json.dumps(clean, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"ok": True, "heights": _heights(clean)}
+
+
+class SliceRequest(GenerateRequest):
+    colors: dict = {}
+    predicted_layers: int | None = None
+
+
+@app.post("/api/slice")
+def slice_endpoint(req: SliceRequest):
+    result, warnings, fname = _engrave(req)
+    faces = req.faces or _read_faces()
+    base = (faces.get("base") or {}).get("normal")
+    if not base:
+        warnings.append("No hay base de impresión marcada: se lamina en la orientación del STL.")
+    changes = [sl.ColorChange(layer=c.get("layer"), color=c.get("color", "#ffffff"),
+                              fraction=c.get("fraction"), z=c.get("z"))
+               for c in (req.colors or {}).get("changes", [])]
+    try:
+        gcode, info = sl.slice_mesh(result, base, _slicer_cfg(), changes, req.predicted_layers)
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(400, str(e))
+    last_gcode.update(data=gcode.encode("utf-8"), name=fname + ".gcode")
+    info["warnings"] = warnings + info["warnings"]
+    info["name"] = fname + ".gcode"
+    return info
+
+
+@app.get("/api/last_gcode")
+def get_last_gcode():
+    if not last_gcode["data"]:
+        raise HTTPException(404, "Todavía no se ha laminado nada")
+    return Response(last_gcode["data"], media_type="text/x-gcode", headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(last_gcode['name'])}"})
 
 
 app.mount("/", StaticFiles(directory=paths.STATIC, html=True), name="static")

@@ -287,7 +287,41 @@ def autodetect_faces(mesh: trimesh.Trimesh) -> dict[str, dict]:
             out["front"] = {"point": centroid(i).tolist(), "normal": n.tolist(), "up": [0, 0, 1]}
         if len(out) == 3:
             break
+    base = detect_base(mesh)
+    if base:
+        out["base"] = base
     return out
+
+
+def _boundary_loops(mesh: trimesh.Trimesh, faces) -> int:
+    """Número de contornos de una cara plana (2 o más = tiene agujeros)."""
+    edges = np.sort(mesh.faces[faces][:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2), axis=1)
+    uniq, counts = np.unique(edges, axis=0, return_counts=True)
+    border = uniq[counts == 1]
+    parent: dict[int, int] = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    for a, b in border:
+        parent[find(a)] = find(b)
+    return len({find(v) for v in border.reshape(-1)})
+
+
+def detect_base(mesh: trimesh.Trimesh) -> dict | None:
+    """Cara de apoyo para imprimir: la mayor cara plana con agujero que mira hacia abajo
+    sin ser horizontal (en template.stl, la cara inclinada con el agujero)."""
+    for i in np.argsort(-mesh.facets_area):
+        n = mesh.facets_normal[i]
+        if -0.99 < n[2] < -0.1 and _boundary_loops(mesh, mesh.facets[i]) >= 2:
+            f = mesh.facets[i]
+            w = mesh.area_faces[f]
+            c = (mesh.triangles_center[f] * w[:, None]).sum(0) / w.sum()
+            return {"point": c.tolist(), "normal": n.tolist()}
+    return None
 
 
 def main():

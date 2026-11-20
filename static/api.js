@@ -30,6 +30,22 @@ const serverApi = {
     if (!res.ok) throw new Error(out.detail);
     return out;
   },
+  async capabilities() {
+    try { return await (await fetch("/api/capabilities")).json(); } catch { return { slice: false }; }
+  },
+  async getSlicer() { return (await fetch("/api/slicer")).json(); },
+  async putSlicer(cfg) {
+    const res = await fetch("/api/slicer", { method: "PUT", headers: { "Content-Type": "application/json" },
+                                             body: JSON.stringify(cfg) });
+    return res.json();
+  },
+  async slice(body) {
+    const res = await fetch("/api/slice", { method: "POST", headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify(body) });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.detail || res.statusText);
+    return out;
+  },
 };
 
 // ------------------------------------------------------------ local (navegador)
@@ -110,20 +126,28 @@ function makeLocalApi() {
   }
   function keepSettings(oldFaces, newFaces) {
     for (const [k, f] of Object.entries(newFaces)) {
+      if (k === "base") continue;
       for (const [p, v] of Object.entries(oldFaces[k] || {})) if (!["point", "normal", "up"].includes(p)) f[p] = v;
     }
+    if (oldFaces.colors) newFaces.colors = oldFaces.colors;
     return newFaces;
   }
 
   return {
     mode: "local",
     canResetTemplate: true,
+    async capabilities() { return { slice: false }; },
     async getConfig() {
       if (!fontList) {
         try { fontList = await (await fetch("fonts/index.json")).json(); } catch { fontList = FALLBACK_FONTS; }
       }
       engine(); // empezar a cargar el WASM en segundo plano
-      return { faces: lsGet(LS_FACES) || (await defaultFaces()), fonts: fontList };
+      const faces = lsGet(LS_FACES) || (await defaultFaces());
+      if (!faces.base) { // ajustes guardados antes de existir la base: detectarla
+        const b = (await getModel()).autodetectFaces().base;
+        if (b) faces.base = b;
+      }
+      return { faces, fonts: fontList };
     },
     getTemplate: async () => (await loadTemplate()).slice(0),
     async generate(jobs) {

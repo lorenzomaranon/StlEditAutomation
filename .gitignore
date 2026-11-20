@@ -7,3 +7,4 @@ build/
 Output/
 error.log
 _site/
+slicer.json

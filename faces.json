@@ -76,5 +76,23 @@
       0,
       0
     ]
+  },
+  "base": {
+    "point": [
+      -8.5697,
+      22.4999,
+      -26.4777
+    ],
+    "normal": [
+      0.8348,
+      0.0,
+      -0.5506
+    ]
+  },
+  "colors": {
+    "initial": "#e8e8e8",
+    "layer_height": 0.2,
+    "first_layer": 0.2,
+    "changes": []
   }
 }

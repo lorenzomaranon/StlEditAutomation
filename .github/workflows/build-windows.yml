@@ -29,6 +29,11 @@ jobs:
       - name: Prueba rápida del motor de grabado
         run: python engrave.py --front "TEST" --left "Ñandú" --right "123" -o test.stl
 
+      - name: Tests (cambios de color, perfiles de OrcaSlicer)
+        run: |
+          pip install pytest
+          python -m pytest -q tests
+
       - name: PyInstaller
         run: pyinstaller GrabadorSTL.spec --noconfirm
 

@@ -10,7 +10,7 @@ datas = [
     ("assets/icon.ico", "assets"),
 ]
 binaries = []
-hiddenimports = collect_submodules("uvicorn") + ["app", "engrave", "paths"]
+hiddenimports = collect_submodules("uvicorn") + ["app", "engrave", "paths", "slicer"]
 
 for pkg in ("webview", "manifold3d", "fontTools"):
     d, b, h = collect_all(pkg)
