@@ -71,6 +71,7 @@ Si el texto se sale de la cara plana aparece un aviso ⚠: reduce la altura o mu
 
 En la tarjeta **Colores** eliges el color inicial y añades cambios de filamento:
 - **Mitades / Tercios / Cuartos** reparte la pieza en partes iguales. Si el número de capas es impar se redondea hacia arriba: con 151 capas, el M600 va al inicio de la capa 76.
+- **Banderas** (España, Portugal, Francia, Alemania, Italia) ponen de una vez el color inicial y los cambios de esa bandera. España: 1/4 rojo, 1/2 amarillo, 1/4 rojo. Portugal: 2/5 verde, 3/5 rojo. Como los cambios de color van por capas, las banderas de franjas verticales salen en franjas horizontales, con la franja izquierda abajo (Francia: azul, blanco, rojo).
 - **+ Cambio** añade otro cambio. Con **⇕** lo seleccionas y lo mueves capa a capa con el deslizador del visor, o escribes la capa directamente.
 - El visor pinta cada tramo de su color. **Vista de impresión** muestra la pieza apoyada en su base, sobre la cama.
 

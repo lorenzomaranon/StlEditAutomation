@@ -318,7 +318,21 @@ function sortedChanges() {
   return [...colorsCfg().changes].sort((a, b) => a.layer - b.layer);
 }
 
-const FRACTION_NAMES = { 0.5: "mitad", [1 / 3]: "1/3", [2 / 3]: "2/3", 0.25: "1/4", 0.75: "3/4" };
+const FRACTION_NAMES = { 0.5: "mitad", [1 / 3]: "1/3", [2 / 3]: "2/3", 0.25: "1/4", 0.75: "3/4", 0.4: "2/5", 0.6: "3/5" };
+
+// Banderas: colores de abajo arriba (las franjas verticales se imprimen horizontales,
+// con la franja izquierda abajo).
+const FLAGS = {
+  es: { name: "España", initial: "#AA151B",
+        changes: [{ fraction: 1 / 4, color: "#F1BF00" }, { fraction: 3 / 4, color: "#AA151B" }] },
+  pt: { name: "Portugal", initial: "#046A38", changes: [{ fraction: 2 / 5, color: "#DA291C" }] },
+  fr: { name: "Francia", initial: "#0055A4",
+        changes: [{ fraction: 1 / 3, color: "#FFFFFF" }, { fraction: 2 / 3, color: "#EF4135" }] },
+  de: { name: "Alemania", initial: "#FFCE00",
+        changes: [{ fraction: 1 / 3, color: "#DD0000" }, { fraction: 2 / 3, color: "#000000" }] },
+  it: { name: "Italia", initial: "#009246",
+        changes: [{ fraction: 1 / 3, color: "#FFFFFF" }, { fraction: 2 / 3, color: "#CE2B37" }] },
+};
 
 function refreshColors() {
   if (!pf || !model) return;
@@ -439,6 +453,16 @@ function splitEqual(parts) {
   selectedChange = null;
   renderColors();
 }
+
+function applyPreset(flag) {
+  const c = colorsCfg();
+  c.initial = flag.initial;
+  c.changes = flag.changes.map((ch) => ({ ...ch }));
+  selectedChange = null;
+  renderColors();
+}
+document.querySelectorAll("[data-flag]").forEach((b) =>
+  b.addEventListener("click", () => applyPreset(FLAGS[b.dataset.flag])));
 
 document.getElementById("col0").addEventListener("input", (e) => { colorsCfg().initial = e.target.value; refreshColors(); });
 for (const [id, k] of [["lh", "layer_height"], ["fl", "first_layer"]]) {

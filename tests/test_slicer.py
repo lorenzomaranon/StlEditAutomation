@@ -116,3 +116,13 @@ def test_resolve_and_flatten(tmp_path):
     assert "compatible_printers" not in flat
     assert sl.layer_heights(flat) == (0.16, 0.2)
     assert sl.list_presets(tmp_path)["process"][0]["name"] == "Mi perfil"
+
+
+@pytest.mark.parametrize("fractions,expected", [
+    ((1 / 4, 3 / 4), [79, 237]),   # España
+    ((2 / 5,), [127]),             # Portugal
+    ((1 / 3, 2 / 3), [106, 211]),  # Francia, Alemania, Italia
+])
+def test_flag_fractions(fractions, expected):
+    g, ins, w = sl.insert_color_changes(fake_gcode(315), [sl.ColorChange(fraction=f) for f in fractions])
+    assert [c["layer"] for c in ins] == expected and layer_of_m600(g) == expected and not w
