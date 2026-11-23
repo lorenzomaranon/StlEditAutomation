@@ -61,6 +61,7 @@
   #layerSlider { writing-mode: vertical-lr; direction: rtl; flex:1; width:30px; margin:0; }
   #layerLabel { background:#111827d9; color:#fff; padding:4px 8px; border-radius:6px; font-size:12px; white-space:nowrap; }
   .base-row { align-items:center; }
+  .flags { align-items:center; gap:6px; }
   .opts > summary { font-size:12px; color:var(--muted); cursor:pointer; margin-top:6px; }
 
   /* ---------- móvil: visor arriba fijo, formulario debajo, botones abajo ---------- */
@@ -106,6 +107,13 @@
       <button class="small" data-split="2">Mitades</button>
       <button class="small" data-split="3">Tercios</button>
       <button class="small" data-split="4">Cuartos</button>
+    </div>
+    <div class="row flags"><span class="note">Banderas:</span>
+      <button class="small" data-flag="es" title="España: 1/4 rojo, 1/2 amarillo, 1/4 rojo">🇪🇸 España</button>
+      <button class="small" data-flag="pt" title="Portugal: 2/5 verde, 3/5 rojo">🇵🇹 Portugal</button>
+      <button class="small" data-flag="fr" title="Francia: azul, blanco, rojo (de abajo arriba)">🇫🇷 Francia</button>
+      <button class="small" data-flag="de" title="Alemania: oro abajo, rojo, negro arriba">🇩🇪 Alemania</button>
+      <button class="small" data-flag="it" title="Italia: verde, blanco, rojo (de abajo arriba)">🇮🇹 Italia</button>
     </div>
   </div>
   <details class="card" id="sliceCard" hidden open>
